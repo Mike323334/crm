@@ -5,6 +5,7 @@ import {
   createContact,
   createDeal,
   createInvite,
+  createPipeline,
   deleteActivity,
   deleteContact,
   deleteDeal,
@@ -14,9 +15,17 @@ import {
   listActivities,
   listContacts,
   listDeals,
+  listPipelines,
+  listUsers,
+  getPipelineAnalytics,
+  getActivityNotifications,
+  revokeInvite,
+  resetUserPassword,
   updateActivity,
   updateContact,
-  updateDeal
+  updateDeal,
+  updateUserRole,
+  updateUserStatus
 } from "./crmApi";
 
 const initialAuth = {
@@ -71,18 +80,40 @@ const App = () => {
 
   const [deals, setDeals] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [allActivities, setAllActivities] = useState([]);
+  const [activityNotifications, setActivityNotifications] = useState({
+    overdue: [],
+    upcoming: []
+  });
   const [dealForm, setDealForm] = useState(initialDeal);
   const [activityForm, setActivityForm] = useState(initialActivity);
   const [inviteForm, setInviteForm] = useState({
     email: "",
-    role: "member"
+    role: "member",
+    expiresInDays: 7
   });
   const [invites, setInvites] = useState([]);
   const [copiedToken, setCopiedToken] = useState("");
   const [lastInviteToken, setLastInviteToken] = useState("");
 
+  const [pipelines, setPipelines] = useState([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState("");
+  const [pipelineDeals, setPipelineDeals] = useState([]);
+  const [pipelineForm, setPipelineForm] = useState({
+    name: "",
+    stages: "Prospecting, Proposal, Negotiation, Won, Lost"
+  });
+  const [pipelineAnalytics, setPipelineAnalytics] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+
+  const [users, setUsers] = useState([]);
+  const [passwordResets, setPasswordResets] = useState({});
+
   const isAuthed = Boolean(token);
   const isAdmin = me?.role === "admin";
+  const selectedPipeline = pipelines.find(
+    (pipeline) => pipeline._id === selectedPipelineId
+  );
   const selectedContactName = useMemo(() => {
     if (!selectedContact) return "Contact";
     return `${selectedContact.firstName} ${selectedContact.lastName}`.trim();
@@ -147,10 +178,52 @@ const App = () => {
     setInvites(result.invites);
   };
 
+  const loadPipelines = async () => {
+    if (!token) return;
+    const result = await listPipelines(token);
+    setPipelines(result.pipelines);
+    if (!selectedPipelineId && result.pipelines.length > 0) {
+      setSelectedPipelineId(result.pipelines[0]._id);
+    }
+  };
+
+  const loadPipelineDeals = async () => {
+    if (!token || !selectedPipelineId) return;
+    const result = await listDeals(token);
+    const filtered = result.deals.filter(
+      (deal) => deal.pipelineId === selectedPipelineId
+    );
+    setPipelineDeals(filtered);
+  };
+
+  const loadPipelineAnalytics = async () => {
+    if (!token || !selectedPipelineId) return;
+    const result = await getPipelineAnalytics(token, selectedPipelineId);
+    setPipelineAnalytics(result.analytics);
+  };
+
+  const loadUsers = async () => {
+    if (!token || !isAdmin) return;
+    const result = await listUsers(token);
+    setUsers(result.users);
+  };
+
   const loadContacts = async () => {
     if (!token) return;
     const result = await listContacts(token, contactSearch);
     setContacts(result.contacts);
+  };
+
+  const loadAllActivities = async () => {
+    if (!token) return;
+    const result = await listActivities(token);
+    setAllActivities(result.activities);
+  };
+
+  const loadActivityNotifications = async () => {
+    if (!token) return;
+    const result = await getActivityNotifications(token, 7);
+    setActivityNotifications(result);
   };
 
   const loadContactDetail = async (contactId) => {
@@ -253,6 +326,9 @@ const App = () => {
       };
       const result = await createDeal(token, payload);
       setDeals([result.deal, ...deals]);
+      if (result.deal.pipelineId === selectedPipelineId) {
+        setPipelineDeals([result.deal, ...pipelineDeals]);
+      }
       setDealForm(initialDeal);
     } catch (err) {
       setError(err.message);
@@ -267,6 +343,11 @@ const App = () => {
     try {
       const result = await updateDeal(token, deal._id, deal);
       setDeals(deals.map((item) => (item._id === deal._id ? result.deal : item)));
+      setPipelineDeals(
+        pipelineDeals.map((item) =>
+          item._id === deal._id ? result.deal : item
+        )
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -280,6 +361,7 @@ const App = () => {
     try {
       await deleteDeal(token, id);
       setDeals(deals.filter((deal) => deal._id !== id));
+      setPipelineDeals(pipelineDeals.filter((deal) => deal._id !== id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -315,7 +397,7 @@ const App = () => {
     try {
       const result = await createInvite(token, inviteForm);
       setInvites([result.invite, ...invites]);
-      setInviteForm({ email: "", role: "member" });
+      setInviteForm({ email: "", role: "member", expiresInDays: 7 });
       setLastInviteToken(result.invite?.token || "");
     } catch (err) {
       setError(err.message);
@@ -331,6 +413,96 @@ const App = () => {
       setTimeout(() => setCopiedToken(""), 1500);
     } catch (err) {
       setError("Unable to copy invite token");
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId) => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await revokeInvite(token, inviteId);
+      setInvites(
+        invites.map((invite) =>
+          invite._id === inviteId ? result.invite : invite
+        )
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreatePipeline = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const stages = pipelineForm.stages
+        .split(",")
+        .map((stage, index) => ({
+          name: stage.trim(),
+          order: index
+        }))
+        .filter((stage) => stage.name);
+      const result = await createPipeline(token, {
+        name: pipelineForm.name || "New Pipeline",
+        stages
+      });
+      setPipelines([...pipelines, result.pipeline]);
+      setSelectedPipelineId(result.pipeline._id);
+      setPipelineForm({
+        name: "",
+        stages: "Prospecting, Proposal, Negotiation, Won, Lost"
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId, role) => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await updateUserRole(token, userId, role);
+      setUsers(users.map((user) => (user._id === userId ? result.user : user)));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusToggle = async (userId, isActive) => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await updateUserStatus(token, userId, isActive);
+      setUsers(users.map((user) => (user._id === userId ? result.user : user)));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (userId) => {
+    const password = passwordResets[userId];
+    if (!password) {
+      setError("Enter a temporary password");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await resetUserPassword(token, userId, password);
+      setPasswordResets({ ...passwordResets, [userId]: "" });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -368,12 +540,35 @@ const App = () => {
     if (!token) return;
     loadMe().catch((err) => setError(err.message));
     loadDashboard().catch((err) => setError(err.message));
+    loadPipelines().catch((err) => setError(err.message));
+    loadActivityNotifications().catch((err) => setError(err.message));
   }, [token]);
 
   useEffect(() => {
     if (!token || !isAdmin) return;
     loadInvites().catch((err) => setError(err.message));
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    loadUsers().catch((err) => setError(err.message));
+  }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token || view !== "pipeline") return;
+    loadPipelines().catch((err) => setError(err.message));
+  }, [token, view]);
+
+  useEffect(() => {
+    if (!token || view !== "pipeline" || !selectedPipelineId) return;
+    loadPipelineDeals().catch((err) => setError(err.message));
+    loadPipelineAnalytics().catch((err) => setError(err.message));
+  }, [token, view, selectedPipelineId]);
+
+  useEffect(() => {
+    if (!token || view !== "calendar") return;
+    loadAllActivities().catch((err) => setError(err.message));
+  }, [token, view]);
 
   useEffect(() => {
     if (!token || view !== "contacts") return;
@@ -519,6 +714,20 @@ const App = () => {
             >
               Contacts
             </button>
+            <button
+              type="button"
+              className={view === "pipeline" ? "active" : ""}
+              onClick={() => setView("pipeline")}
+            >
+              Pipeline
+            </button>
+            <button
+              type="button"
+              className={view === "calendar" ? "active" : ""}
+              onClick={() => setView("calendar")}
+            >
+              Calendar
+            </button>
           </nav>
 
           {view === "dashboard" ? (
@@ -538,6 +747,50 @@ const App = () => {
               <div className="card stat">
                 <h3>Activities Due</h3>
                 <p>{stats?.activitiesDue ?? 0}</p>
+              </div>
+              <div className="card">
+                <h3>Upcoming Tasks</h3>
+                <div className="list dense">
+                  {activityNotifications.upcoming.length === 0 ? (
+                    <p className="muted">No upcoming tasks.</p>
+                  ) : (
+                    activityNotifications.upcoming.slice(0, 4).map((activity) => (
+                      <div key={activity._id} className="list-item">
+                        <div className="list-main">
+                          <strong>{activity.title}</strong>
+                          <span className="muted">
+                            Due{" "}
+                            {activity.dueDate
+                              ? new Date(activity.dueDate).toLocaleDateString()
+                              : "No date"}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="card">
+                <h3>Overdue</h3>
+                <div className="list dense">
+                  {activityNotifications.overdue.length === 0 ? (
+                    <p className="muted">No overdue tasks.</p>
+                  ) : (
+                    activityNotifications.overdue.slice(0, 4).map((activity) => (
+                      <div key={activity._id} className="list-item">
+                        <div className="list-main">
+                          <strong>{activity.title}</strong>
+                          <span className="muted">
+                            Due{" "}
+                            {activity.dueDate
+                              ? new Date(activity.dueDate).toLocaleDateString()
+                              : "No date"}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
               <div className="card">
                 <h3>Quick Actions</h3>
@@ -571,6 +824,21 @@ const App = () => {
                       <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </select>
+                  <select
+                    value={inviteForm.expiresInDays}
+                    onChange={(e) =>
+                      setInviteForm({
+                        ...inviteForm,
+                        expiresInDays: Number(e.target.value)
+                      })
+                    }
+                  >
+                    <option value={1}>1 day</option>
+                    <option value={3}>3 days</option>
+                    <option value={7}>7 days</option>
+                    <option value={14}>14 days</option>
+                    <option value={30}>30 days</option>
+                  </select>
                     <button type="submit" disabled={loading}>
                       {loading ? "Sending..." : "Generate invite"}
                     </button>
@@ -599,6 +867,13 @@ const App = () => {
                             <span className="muted">
                               {invite.role} • {invite.status}
                             </span>
+                          <span className="muted small">
+                            {invite.expiresAt
+                              ? `Expires ${new Date(
+                                  invite.expiresAt
+                                ).toLocaleDateString()}`
+                              : "No expiry"}
+                          </span>
                           </div>
                           <div className="inline-actions">
                             <code className="token">{invite.token}</code>
@@ -609,6 +884,14 @@ const App = () => {
                             >
                               {copiedToken === invite.token ? "Copied" : "Copy"}
                             </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => handleRevokeInvite(invite._id)}
+                            disabled={invite.status === "revoked"}
+                          >
+                            {invite.status === "revoked" ? "Revoked" : "Revoke"}
+                          </button>
                           </div>
                         </div>
                       ))
@@ -618,6 +901,67 @@ const App = () => {
                     Share the token with the employee. They will enter it during
                     registration.
                   </p>
+                </div>
+              ) : null}
+              {isAdmin ? (
+                <div className="card">
+                  <h3>User Management</h3>
+                  <div className="list dense">
+                    {users.length === 0 ? (
+                      <p className="muted">No users yet.</p>
+                    ) : (
+                      users.map((user) => (
+                        <div key={user._id} className="list-item user-item">
+                          <div className="list-main">
+                            <strong>{user.email}</strong>
+                            <span className="muted">
+                              {user.isActive ? "Active" : "Disabled"}
+                            </span>
+                          </div>
+                          <div className="inline-actions">
+                            <select
+                              value={user.role}
+                              onChange={(e) =>
+                                handleRoleChange(user._id, e.target.value)
+                              }
+                            >
+                              <option value="member">Member</option>
+                              <option value="manager">Manager</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() =>
+                                handleStatusToggle(user._id, !user.isActive)
+                              }
+                            >
+                              {user.isActive ? "Deactivate" : "Activate"}
+                            </button>
+                          </div>
+                          <div className="inline-actions">
+                            <input
+                              type="text"
+                              placeholder="Temp password"
+                              value={passwordResets[user._id] || ""}
+                              onChange={(e) =>
+                                setPasswordResets({
+                                  ...passwordResets,
+                                  [user._id]: e.target.value
+                                })
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handlePasswordReset(user._id)}
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               ) : null}
             </section>
@@ -1058,6 +1402,254 @@ const App = () => {
                 )}
               </section>
             </div>
+          ) : null}
+
+          {view === "pipeline" ? (
+            <div className="grid two">
+              <section className="card">
+                <div className="card-header">
+                  <h2>Pipeline Board</h2>
+                  <select
+                    value={selectedPipelineId}
+                    onChange={(e) => setSelectedPipelineId(e.target.value)}
+                  >
+                    {pipelines.map((pipeline) => (
+                      <option key={pipeline._id} value={pipeline._id}>
+                        {pipeline.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {!selectedPipeline ? (
+                  <p className="muted">No pipeline yet.</p>
+                ) : (
+                  <div className="pipeline-board">
+                    {selectedPipeline.stages
+                      .slice()
+                      .sort((a, b) => a.order - b.order)
+                      .map((stage) => {
+                        const stageDeals = pipelineDeals.filter(
+                          (deal) => deal.stageId === stage._id
+                        );
+                        return (
+                          <div key={stage._id} className="pipeline-column">
+                            <h3>{stage.name}</h3>
+                            {stageDeals.length === 0 ? (
+                              <p className="muted small">No deals</p>
+                            ) : (
+                              stageDeals.map((deal) => (
+                                <div key={deal._id} className="pipeline-card">
+                                  <strong>{deal.title}</strong>
+                                  <span className="muted">
+                                    ${deal.amount || 0}
+                                  </span>
+                                  <select
+                                    value={deal.stageId}
+                                    onChange={(e) =>
+                                      handleUpdateDeal({
+                                        ...deal,
+                                        stageId: e.target.value
+                                      })
+                                    }
+                                  >
+                                    {selectedPipeline.stages
+                                      .slice()
+                                      .sort((a, b) => a.order - b.order)
+                                      .map((stageOption) => (
+                                        <option
+                                          key={stageOption._id}
+                                          value={stageOption._id}
+                                        >
+                                          {stageOption.name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </section>
+
+              {selectedPipeline && pipelineAnalytics ? (
+                <section className="card">
+                  <h2>Pipeline Analytics</h2>
+                  <div className="grid two">
+                    <div className="card stat">
+                      <h3>Win Rate</h3>
+                      <p>{pipelineAnalytics.winRate}%</p>
+                    </div>
+                    <div className="card stat">
+                      <h3>Avg Time in Stage</h3>
+                      <p>
+                        {pipelineAnalytics.perStageAvgDays.length === 0
+                          ? "0"
+                          : (
+                              pipelineAnalytics.perStageAvgDays.reduce(
+                                (sum, stage) => sum + stage.avgDays,
+                                0
+                              ) / pipelineAnalytics.perStageAvgDays.length
+                            ).toFixed(2)}{" "}
+                        days
+                      </p>
+                    </div>
+                  </div>
+                  <div className="list dense">
+                    {pipelineAnalytics.perStageAvgDays.map((stage) => (
+                      <div key={stage.stageId} className="list-item">
+                        <div className="list-main">
+                          <strong>{stage.stageName}</strong>
+                          <span className="muted">
+                            Avg {stage.avgDays} days
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {isAdmin ? (
+                <section className="card">
+                  <h2>Create Pipeline</h2>
+                  <form onSubmit={handleCreatePipeline} className="form-grid">
+                    <input
+                      type="text"
+                      placeholder="Pipeline name"
+                      value={pipelineForm.name}
+                      onChange={(e) =>
+                        setPipelineForm({
+                          ...pipelineForm,
+                          name: e.target.value
+                        })
+                      }
+                    />
+                    <textarea
+                      placeholder="Stages (comma separated)"
+                      value={pipelineForm.stages}
+                      onChange={(e) =>
+                        setPipelineForm({
+                          ...pipelineForm,
+                          stages: e.target.value
+                        })
+                      }
+                    />
+                    <button type="submit" disabled={loading}>
+                      {loading ? "Saving..." : "Create pipeline"}
+                    </button>
+                  </form>
+                  <p className="muted small">
+                    Deals will use the first stage as default.
+                  </p>
+                </section>
+              ) : null}
+            </div>
+          ) : null}
+
+          {view === "calendar" ? (
+            <section className="card">
+              <div className="card-header">
+                <h2>Task Calendar</h2>
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(
+                          calendarMonth.getFullYear(),
+                          calendarMonth.getMonth() - 1,
+                          1
+                        )
+                      )
+                    }
+                  >
+                    Previous
+                  </button>
+                  <span className="chip">
+                    {calendarMonth.toLocaleString("default", {
+                      month: "long",
+                      year: "numeric"
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(
+                          calendarMonth.getFullYear(),
+                          calendarMonth.getMonth() + 1,
+                          1
+                        )
+                      )
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+              <div className="calendar-grid">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div key={day} className="calendar-header">
+                    {day}
+                  </div>
+                ))}
+                {(() => {
+                  const start = new Date(
+                    calendarMonth.getFullYear(),
+                    calendarMonth.getMonth(),
+                    1
+                  );
+                  const end = new Date(
+                    calendarMonth.getFullYear(),
+                    calendarMonth.getMonth() + 1,
+                    0
+                  );
+                  const startDay = start.getDay();
+                  const totalDays = end.getDate();
+                  const cells = [];
+
+                  for (let i = 0; i < startDay; i += 1) {
+                    cells.push(
+                      <div key={`empty-${i}`} className="calendar-cell empty" />
+                    );
+                  }
+
+                  for (let day = 1; day <= totalDays; day += 1) {
+                    const date = new Date(
+                      calendarMonth.getFullYear(),
+                      calendarMonth.getMonth(),
+                      day
+                    );
+                    const dateKey = date.toDateString();
+                    const tasks = allActivities.filter((activity) => {
+                      if (!activity.dueDate) return false;
+                      return new Date(activity.dueDate).toDateString() === dateKey;
+                    });
+                    cells.push(
+                      <div key={dateKey} className="calendar-cell">
+                        <div className="calendar-date">{day}</div>
+                        {tasks.slice(0, 3).map((task) => (
+                          <div key={task._id} className="calendar-task">
+                            {task.title}
+                          </div>
+                        ))}
+                        {tasks.length > 3 ? (
+                          <div className="calendar-more">
+                            +{tasks.length - 3} more
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                  return cells;
+                })()}
+              </div>
+            </section>
           ) : null}
         </>
       )}

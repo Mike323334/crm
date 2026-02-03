@@ -71,6 +71,9 @@ export const updateActivity = (token, id, payload) =>
 export const deleteActivity = (token, id) =>
   apiRequest(`/api/activities/${id}`, { token, method: "DELETE" });
 
+export const getActivityNotifications = (token, days = 7) =>
+  apiRequest(`/api/activities/notifications?days=${days}`, { token });
+
 export const listInvites = (token) => apiRequest("/api/invites", { token });
 
 export const createInvite = (token, payload) =>
@@ -78,4 +81,52 @@ export const createInvite = (token, payload) =>
     token,
     method: "POST",
     body: JSON.stringify(payload)
+  });
+
+export const revokeInvite = (token, id) =>
+  apiRequest(`/api/invites/${id}/revoke`, {
+    token,
+    method: "PUT"
+  });
+
+export const listPipelines = (token) => apiRequest("/api/pipelines", { token });
+
+export const createPipeline = (token, payload) =>
+  apiRequest("/api/pipelines", {
+    token,
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+export const updatePipeline = (token, id, payload) =>
+  apiRequest(`/api/pipelines/${id}`, {
+    token,
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+
+export const getPipelineAnalytics = (token, id) =>
+  apiRequest(`/api/pipelines/${id}/analytics`, { token });
+
+export const listUsers = (token) => apiRequest("/api/users", { token });
+
+export const updateUserRole = (token, id, role) =>
+  apiRequest(`/api/users/${id}/role`, {
+    token,
+    method: "PUT",
+    body: JSON.stringify({ role })
+  });
+
+export const updateUserStatus = (token, id, isActive) =>
+  apiRequest(`/api/users/${id}/status`, {
+    token,
+    method: "PUT",
+    body: JSON.stringify({ isActive })
+  });
+
+export const resetUserPassword = (token, id, password) =>
+  apiRequest(`/api/users/${id}/password`, {
+    token,
+    method: "PUT",
+    body: JSON.stringify({ password })
   });

@@ -8,6 +8,19 @@ const dealSchema = new mongoose.Schema(
       required: true
     },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    pipelineId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Pipeline",
+      required: true
+    },
+    stageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    stageHistory: [
+      {
+        stageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        enteredAt: { type: Date, required: true },
+        exitedAt: { type: Date }
+      }
+    ],
     contactId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Contact",

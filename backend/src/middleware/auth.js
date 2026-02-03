@@ -12,10 +12,13 @@ const auth = async (req, res, next) => {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(payload.sub).select(
-      "email role companyId"
+      "email role companyId isActive"
     );
     if (!user) {
       return res.status(401).json({ message: "User not found" });
+    }
+    if (!user.isActive) {
+      return res.status(403).json({ message: "Account disabled" });
     }
     req.user = {
       id: user.id,

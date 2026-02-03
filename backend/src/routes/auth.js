@@ -41,6 +41,9 @@ router.post("/register", async (req, res) => {
       if (!invite) {
         return res.status(400).json({ message: "Invalid invite" });
       }
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "Invite revoked" });
+      }
       if (invite.expiresAt && invite.expiresAt < new Date()) {
         return res.status(400).json({ message: "Invite expired" });
       }
@@ -114,6 +117,9 @@ router.post("/login", async (req, res) => {
     const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
+    if (!user.isActive) {
+      return res.status(403).json({ message: "Account disabled" });
     }
 
     const matches = await user.comparePassword(password);

@@ -8,12 +8,24 @@ const dealRoutes = require("./routes/deals");
 const activityRoutes = require("./routes/activities");
 const dashboardRoutes = require("./routes/dashboard");
 const inviteRoutes = require("./routes/invites");
+const pipelineRoutes = require("./routes/pipelines");
+const userRoutes = require("./routes/users");
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:5174",
+      "https://crm-1-nisa.onrender.com"
+    ]
+  })
+);
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -22,6 +34,8 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/invites", inviteRoutes);
+app.use("/api/pipelines", pipelineRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/deals", dealRoutes);
 app.use("/api/activities", activityRoutes);

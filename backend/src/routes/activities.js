@@ -17,6 +17,27 @@ router.get("/", async (req, res) => {
   res.json({ activities });
 });
 
+router.get("/notifications", async (req, res) => {
+  const days = Number(req.query.days || 7);
+  const now = new Date();
+  const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const [overdue, upcoming] = await Promise.all([
+    Activity.find({
+      companyId: req.user.companyId,
+      status: { $ne: "done" },
+      dueDate: { $lt: now }
+    }).sort({ dueDate: 1 }),
+    Activity.find({
+      companyId: req.user.companyId,
+      status: { $ne: "done" },
+      dueDate: { $gte: now, $lte: future }
+    }).sort({ dueDate: 1 })
+  ]);
+
+  res.json({ overdue, upcoming });
+});
+
 router.post("/", async (req, res) => {
   const { contactId } = req.body;
   const contact = await Contact.findOne({

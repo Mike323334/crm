@@ -18,7 +18,7 @@ router.get("/", requireRole("admin"), async (req, res) => {
 });
 
 router.post("/", requireRole("admin"), async (req, res) => {
-  const { email, role = "member" } = req.body;
+  const { email, role = "member", expiresInDays = 7 } = req.body;
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
   }
@@ -52,15 +52,34 @@ router.post("/", requireRole("admin"), async (req, res) => {
   }
 
   const token = crypto.randomBytes(24).toString("hex");
+  const expiresAt =
+    expiresInDays === null
+      ? null
+      : new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000);
   const invite = await Invite.create({
     email: normalizedEmail,
     token,
     role,
     companyId: req.user.companyId,
-    invitedBy: req.user.id
+    invitedBy: req.user.id,
+    expiresAt
   });
 
   return res.status(201).json({ invite });
+});
+
+router.put("/:id/revoke", requireRole("admin"), async (req, res) => {
+  const invite = await Invite.findOneAndUpdate(
+    { _id: req.params.id, companyId: req.user.companyId },
+    { status: "revoked" },
+    { new: true }
+  );
+
+  if (!invite) {
+    return res.status(404).json({ message: "Invite not found" });
+  }
+
+  return res.json({ invite });
 });
 
 module.exports = router;
