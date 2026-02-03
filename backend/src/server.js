@@ -10,6 +10,8 @@ const dashboardRoutes = require("./routes/dashboard");
 const inviteRoutes = require("./routes/invites");
 const pipelineRoutes = require("./routes/pipelines");
 const userRoutes = require("./routes/users");
+const fileRoutes = require("./routes/files");
+const path = require("path");
 
 dotenv.config();
 
@@ -36,10 +38,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/pipelines", pipelineRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/files", fileRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/deals", dealRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.use((req, res) => {
   res.status(404).json({ message: "Not found" });

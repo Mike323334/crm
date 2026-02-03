@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { apiRequest, apiFormRequest, API_URL } from "./api";
 
 export const getDashboard = (token) => apiRequest("/api/dashboard", { token });
 
@@ -130,3 +130,28 @@ export const resetUserPassword = (token, id, password) =>
     method: "PUT",
     body: JSON.stringify({ password })
   });
+
+export const listAttachments = (token, contactId, dealId) => {
+  const params = new URLSearchParams();
+  if (contactId) params.append("contactId", contactId);
+  if (dealId) params.append("dealId", dealId);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/files${query}`, { token });
+};
+
+export const uploadAttachment = (token, { contactId, dealId, file }) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (contactId) formData.append("contactId", contactId);
+  if (dealId) formData.append("dealId", dealId);
+  return apiFormRequest("/api/files", formData, token);
+};
+
+export const deleteAttachment = (token, id) =>
+  apiRequest(`/api/files/${id}`, { token, method: "DELETE" });
+
+export const resolveFileUrl = (path) => {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return `${API_URL}${path}`;
+};

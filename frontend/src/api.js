@@ -18,3 +18,22 @@ export const apiRequest = async (path, options = {}) => {
 
   return response.json();
 };
+
+export const apiFormRequest = async (path, formData, token) => {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.message || "Request failed");
+  }
+
+  return response.json();
+};
+
+export { API_URL };

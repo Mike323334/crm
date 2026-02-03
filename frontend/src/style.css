@@ -424,3 +424,7 @@ select:focus {
   font-size: 11px;
   color: var(--muted);
 }
+
+.list-item a.ghost {
+  text-decoration: none;
+}

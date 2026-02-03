@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { register, login, getMe } from "./auth";
+import { register, login, getMe, forgotPassword, resetPassword } from "./auth";
 import {
   createActivity,
   createContact,
@@ -21,6 +21,10 @@ import {
   getActivityNotifications,
   revokeInvite,
   resetUserPassword,
+  listAttachments,
+  uploadAttachment,
+  deleteAttachment,
+  resolveFileUrl,
   updateActivity,
   updateContact,
   updateDeal,
@@ -65,6 +69,10 @@ const initialActivity = {
 const App = () => {
   const [registerForm, setRegisterForm] = useState(initialAuth);
   const [loginForm, setLoginForm] = useState(initialAuth);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetInfo, setResetInfo] = useState("");
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [me, setMe] = useState(null);
   const [error, setError] = useState("");
@@ -106,6 +114,10 @@ const App = () => {
   const [pipelineAnalytics, setPipelineAnalytics] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentDealId, setAttachmentDealId] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState(null);
+
   const [users, setUsers] = useState([]);
   const [passwordResets, setPasswordResets] = useState({});
 
@@ -144,6 +156,42 @@ const App = () => {
       localStorage.setItem("token", result.token);
       setToken(result.token);
       setLoginForm(initialAuth);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (event) => {
+    event.preventDefault();
+    setError("");
+    setResetInfo("");
+    setLoading(true);
+    try {
+      const result = await forgotPassword(forgotEmail);
+      if (result.resetToken) {
+        setResetToken(result.resetToken);
+        setResetInfo("Reset token generated. Paste it below to reset.");
+      } else {
+        setResetInfo("If the email exists, a reset token was created.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+    setError("");
+    setResetInfo("");
+    setLoading(true);
+    try {
+      await resetPassword(resetToken, resetPasswordValue);
+      setResetInfo("Password updated. You can sign in now.");
+      setResetPasswordValue("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -241,6 +289,8 @@ const App = () => {
       ...contactResult.contact,
       tags: (contactResult.contact.tags || []).join(", ")
     });
+    const attachmentsResult = await listAttachments(token, contactId);
+    setAttachments(attachmentsResult.attachments);
   };
 
   const handleCreateContact = async (event) => {
@@ -362,6 +412,40 @@ const App = () => {
       await deleteDeal(token, id);
       setDeals(deals.filter((deal) => deal._id !== id));
       setPipelineDeals(pipelineDeals.filter((deal) => deal._id !== id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadAttachment = async (event) => {
+    event.preventDefault();
+    if (!attachmentFile || !selectedContactId) return;
+    setError("");
+    setLoading(true);
+    try {
+      const result = await uploadAttachment(token, {
+        contactId: selectedContactId,
+        dealId: attachmentDealId || undefined,
+        file: attachmentFile
+      });
+      setAttachments([result.attachment, ...attachments]);
+      setAttachmentFile(null);
+      setAttachmentDealId("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (id) => {
+    setError("");
+    setLoading(true);
+    try {
+      await deleteAttachment(token, id);
+      setAttachments(attachments.filter((item) => item._id !== id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -693,6 +777,46 @@ const App = () => {
               />
               <button type="submit" disabled={loading}>
                 {loading ? "Working..." : "Sign in"}
+              </button>
+            </form>
+          </section>
+
+          <section className="card">
+            <h2>Forgot Password</h2>
+            <form onSubmit={handleForgotPassword}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? "Sending..." : "Generate reset token"}
+              </button>
+            </form>
+            {resetInfo ? <p className="muted">{resetInfo}</p> : null}
+          </section>
+
+          <section className="card">
+            <h2>Reset Password</h2>
+            <form onSubmit={handleResetPassword}>
+              <input
+                type="text"
+                placeholder="Reset token"
+                value={resetToken}
+                onChange={(e) => setResetToken(e.target.value)}
+                required
+              />
+              <input
+                type="password"
+                placeholder="New password"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                required
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? "Updating..." : "Update password"}
               </button>
             </form>
           </section>
@@ -1388,6 +1512,64 @@ const App = () => {
                                     onClick={() =>
                                       handleDeleteActivity(activity._id)
                                     }
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <div className="card nested">
+                        <h3>Attachments</h3>
+                        <form onSubmit={handleUploadAttachment} className="form-grid">
+                          <input
+                            type="file"
+                            onChange={(e) =>
+                              setAttachmentFile(e.target.files?.[0] || null)
+                            }
+                          />
+                          <select
+                            value={attachmentDealId}
+                            onChange={(e) => setAttachmentDealId(e.target.value)}
+                          >
+                            <option value="">Attach to contact</option>
+                            {deals.map((deal) => (
+                              <option key={deal._id} value={deal._id}>
+                                {deal.title}
+                              </option>
+                            ))}
+                          </select>
+                          <button type="submit" disabled={loading || !attachmentFile}>
+                            Upload
+                          </button>
+                        </form>
+                        <div className="list dense">
+                          {attachments.length === 0 ? (
+                            <p className="muted">No files yet.</p>
+                          ) : (
+                            attachments.map((item) => (
+                              <div key={item._id} className="list-item">
+                                <div className="list-main">
+                                  <strong>{item.originalName}</strong>
+                                  <span className="muted">
+                                    {(item.size / 1024).toFixed(1)} KB
+                                  </span>
+                                </div>
+                                <div className="inline-actions">
+                                  <a
+                                    className="ghost"
+                                    href={resolveFileUrl(item.url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Download
+                                  </a>
+                                  <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() => handleDeleteAttachment(item._id)}
                                   >
                                     Delete
                                   </button>

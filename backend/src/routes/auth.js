@@ -1,5 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
 const Company = require("../models/Company");
 const Invite = require("../models/Invite");
@@ -132,6 +133,59 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
+});
+
+router.post("/forgot", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    return res.status(200).json({ success: true });
+  }
+
+  const token = crypto.randomBytes(24).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  user.resetPasswordTokenHash = tokenHash;
+  user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+  await user.save();
+
+  return res.json({
+    success: true,
+    resetToken: token
+  });
+});
+
+router.post("/reset", async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).json({ message: "Token and password required" });
+  }
+  if (password.length < 6) {
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters" });
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordExpires: { $gt: new Date() }
+  });
+
+  if (!user) {
+    return res.status(400).json({ message: "Invalid or expired token" });
+  }
+
+  user.password = password;
+  user.resetPasswordTokenHash = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
+  return res.json({ success: true });
 });
 
 router.get("/me", auth, async (req, res) => {
