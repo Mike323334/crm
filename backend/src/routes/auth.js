@@ -170,7 +170,9 @@ router.post("/forgot", async (req, res) => {
     ? `${frontendUrl}?resetToken=${token}`
     : null;
 
-  if (resetLink && process.env.SMTP_HOST) {
+  const hasSmtp = Boolean(process.env.SMTP_HOST);
+
+  if (resetLink && hasSmtp) {
     try {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -195,18 +197,20 @@ router.post("/forgot", async (req, res) => {
       // eslint-disable-next-line no-console
       console.error("Failed to send reset email", error);
     }
-  } else {
+  } else if (!resetLink || !hasSmtp) {
     // eslint-disable-next-line no-console
     console.warn(
       "Reset email not sent (missing FRONTEND_URL or SMTP_HOST)."
     );
   }
 
-  return res.json({
-    success: true,
-    resetToken: token,
-    resetLink
-  });
+  const response = { success: true };
+  if (!hasSmtp) {
+    response.resetToken = token;
+    response.resetLink = resetLink;
+  }
+
+  return res.json(response);
 });
 
 router.post("/reset", async (req, res) => {

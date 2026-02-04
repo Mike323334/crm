@@ -177,7 +177,10 @@ const App = () => {
         setResetLink(result.resetLink || "");
         setResetInfo("Reset token generated. Paste it below to reset.");
       } else {
-        setResetInfo("If the email exists, a reset token was created.");
+        setResetLink("");
+        setResetInfo(
+          "If the email exists, a reset link was sent to the inbox."
+        );
       }
     } catch (err) {
       setError(err.message);
