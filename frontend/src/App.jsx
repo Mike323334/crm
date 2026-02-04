@@ -74,6 +74,7 @@ const App = () => {
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resetInfo, setResetInfo] = useState("");
   const [resetLink, setResetLink] = useState("");
+  const [authView, setAuthView] = useState("login");
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [me, setMe] = useState(null);
   const [error, setError] = useState("");
@@ -207,6 +208,7 @@ const App = () => {
     if (token) {
       setResetToken(token);
       setResetInfo("Reset token loaded from link.");
+      setAuthView("reset");
     }
   }, []);
 
@@ -704,140 +706,214 @@ const App = () => {
       {error ? <div className="error">{error}</div> : null}
 
       {!isAuthed ? (
-        <div className="grid two">
-          <section className="card">
-            <h2>Register</h2>
-            <form onSubmit={handleRegister}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={registerForm.email}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, email: e.target.value })
-                }
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={registerForm.password}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, password: e.target.value })
-                }
-                required
-              />
-              <input
-                type="text"
-                placeholder="Invite token (optional)"
-                value={registerForm.inviteToken}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    inviteToken: e.target.value
-                  })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Company name (first admin only)"
-                value={registerForm.companyName}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    companyName: e.target.value
-                  })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Company domain e.g. crm.com"
-                value={registerForm.companyDomain}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    companyDomain: e.target.value
-                  })
-                }
-              />
-              <button type="submit" disabled={loading}>
-                {loading ? "Working..." : "Create account"}
-              </button>
-            </form>
-          </section>
-
-          <section className="card">
-            <h2>Login</h2>
-            <form onSubmit={handleLogin}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={loginForm.email}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, email: e.target.value })
-                }
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={loginForm.password}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, password: e.target.value })
-                }
-                required
-              />
-              <button type="submit" disabled={loading}>
-                {loading ? "Working..." : "Sign in"}
-              </button>
-            </form>
-          </section>
-
-          <section className="card">
-            <h2>Forgot Password</h2>
-            <form onSubmit={handleForgotPassword}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                required
-              />
-              <button type="submit" disabled={loading}>
-                {loading ? "Sending..." : "Generate reset token"}
-              </button>
-            </form>
-            {resetInfo ? <p className="muted">{resetInfo}</p> : null}
-            {resetLink ? (
+        <div className="auth-layout">
+          <section className="auth-hero">
+            <div className="auth-brand">
+              <span className="chip">CRM Workspace</span>
+              <h2>Welcome back</h2>
               <p className="muted">
-                Reset link:{" "}
-                <a href={resetLink} target="_blank" rel="noreferrer">
-                  {resetLink}
-                </a>
+                Sign in to manage contacts, pipeline stages, and tasks in one
+                place.
               </p>
-            ) : null}
+            </div>
+            <div className="auth-tips">
+              <div>
+                <strong>Secure access</strong>
+                <span className="muted">Role-based permissions.</span>
+              </div>
+              <div>
+                <strong>Stay on top</strong>
+                <span className="muted">Tasks, reminders, analytics.</span>
+              </div>
+              <div>
+                <strong>Collaborate</strong>
+                <span className="muted">Invite your team safely.</span>
+              </div>
+            </div>
           </section>
 
-          <section className="card">
-            <h2>Reset Password</h2>
-            <form onSubmit={handleResetPassword}>
-              <input
-                type="text"
-                placeholder="Reset token"
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="New password"
-                value={resetPasswordValue}
-                onChange={(e) => setResetPasswordValue(e.target.value)}
-                required
-              />
-              <button type="submit" disabled={loading}>
-                {loading ? "Updating..." : "Update password"}
+          <section className="auth-panel card">
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={authView === "login" ? "active" : ""}
+                onClick={() => setAuthView("login")}
+              >
+                Login
               </button>
-            </form>
+              <button
+                type="button"
+                className={authView === "register" ? "active" : ""}
+                onClick={() => setAuthView("register")}
+              >
+                Register
+              </button>
+              <button
+                type="button"
+                className={authView === "forgot" ? "active" : ""}
+                onClick={() => setAuthView("forgot")}
+              >
+                Forgot
+              </button>
+              <button
+                type="button"
+                className={authView === "reset" ? "active" : ""}
+                onClick={() => setAuthView("reset")}
+              >
+                Reset
+              </button>
+            </div>
+
+            {authView === "login" ? (
+              <div className="auth-card">
+                <h2>Login</h2>
+                <form onSubmit={handleLogin}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={loginForm.email}
+                    onChange={(e) =>
+                      setLoginForm({ ...loginForm, email: e.target.value })
+                    }
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={loginForm.password}
+                    onChange={(e) =>
+                      setLoginForm({ ...loginForm, password: e.target.value })
+                    }
+                    required
+                  />
+                  <button type="submit" disabled={loading}>
+                    {loading ? "Working..." : "Sign in"}
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  className="ghost auth-link"
+                  onClick={() => setAuthView("forgot")}
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            ) : null}
+
+            {authView === "register" ? (
+              <div className="auth-card">
+                <h2>Create account</h2>
+                <form onSubmit={handleRegister}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={registerForm.email}
+                    onChange={(e) =>
+                      setRegisterForm({ ...registerForm, email: e.target.value })
+                    }
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={registerForm.password}
+                    onChange={(e) =>
+                      setRegisterForm({ ...registerForm, password: e.target.value })
+                    }
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Invite token (optional)"
+                    value={registerForm.inviteToken}
+                    onChange={(e) =>
+                      setRegisterForm({
+                        ...registerForm,
+                        inviteToken: e.target.value
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    placeholder="Company name (first admin only)"
+                    value={registerForm.companyName}
+                    onChange={(e) =>
+                      setRegisterForm({
+                        ...registerForm,
+                        companyName: e.target.value
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    placeholder="Company domain e.g. crm.com"
+                    value={registerForm.companyDomain}
+                    onChange={(e) =>
+                      setRegisterForm({
+                        ...registerForm,
+                        companyDomain: e.target.value
+                      })
+                    }
+                  />
+                  <button type="submit" disabled={loading}>
+                    {loading ? "Working..." : "Create account"}
+                  </button>
+                </form>
+              </div>
+            ) : null}
+
+            {authView === "forgot" ? (
+              <div className="auth-card">
+                <h2>Forgot Password</h2>
+                <form onSubmit={handleForgotPassword}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                  />
+                  <button type="submit" disabled={loading}>
+                    {loading ? "Sending..." : "Generate reset link"}
+                  </button>
+                </form>
+                {resetInfo ? <p className="muted">{resetInfo}</p> : null}
+                {resetLink ? (
+                  <p className="muted">
+                    Reset link:{" "}
+                    <a href={resetLink} target="_blank" rel="noreferrer">
+                      {resetLink}
+                    </a>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {authView === "reset" ? (
+              <div className="auth-card">
+                <h2>Reset Password</h2>
+                <form onSubmit={handleResetPassword}>
+                  <input
+                    type="text"
+                    placeholder="Reset token"
+                    value={resetToken}
+                    onChange={(e) => setResetToken(e.target.value)}
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    value={resetPasswordValue}
+                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                    required
+                  />
+                  <button type="submit" disabled={loading}>
+                    {loading ? "Updating..." : "Update password"}
+                  </button>
+                </form>
+                {resetInfo ? <p className="muted">{resetInfo}</p> : null}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : (
