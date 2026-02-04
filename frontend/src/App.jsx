@@ -187,7 +187,7 @@ const App = () => {
         setResetToken(result.resetToken);
         setResetLink(
           result.resetLink ||
-            `${window.location.origin}/reset?token=${result.resetToken}`
+            `${window.location.origin}/#/reset?token=${result.resetToken}`
         );
         setResetInfo("Reset token generated. Paste it below to reset.");
       } else {
