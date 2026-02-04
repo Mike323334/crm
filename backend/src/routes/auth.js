@@ -168,7 +168,7 @@ router.post("/forgot", async (req, res) => {
 
   const frontendUrl = process.env.FRONTEND_URL || "";
   const resetLink = frontendUrl
-    ? `${frontendUrl}?resetToken=${token}`
+    ? `${frontendUrl}/reset?token=${token}`
     : null;
 
   const hasSmtp = Boolean(process.env.SMTP_HOST);
