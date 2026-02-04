@@ -797,7 +797,7 @@ const App = () => {
                         {loading ? "Working..." : "Sign in"}
                       </button>
                     </form>
-                    <a className="auth-link" href="/forgot">
+                    <a className="auth-link" href="/#/forgot">
                       Forgot your password?
                     </a>
                   </div>
