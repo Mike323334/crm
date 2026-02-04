@@ -63,7 +63,11 @@ router.post("/register", async (req, res) => {
       if (!isAllowedDomain(emailDomain)) {
         return res.status(403).json({ message: "Email domain not allowed" });
       }
-      if (company.domain !== emailDomain) {
+      const companyDomains =
+        company.domains && company.domains.length > 0
+          ? company.domains
+          : [company.domain].filter(Boolean);
+      if (!companyDomains.includes(emailDomain)) {
         return res.status(403).json({ message: "Email domain not allowed" });
       }
       if (invite.email !== normalizedEmail) {
@@ -92,9 +96,11 @@ router.post("/register", async (req, res) => {
         return res.status(403).json({ message: "Email domain not allowed" });
       }
 
+      const domainValue = companyDomain.toLowerCase();
       const company = await Company.create({
         name: companyName,
-        domain: companyDomain.toLowerCase()
+        domain: domainValue,
+        domains: [domainValue]
       });
       companyId = company.id;
       role = "admin";

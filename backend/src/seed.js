@@ -30,7 +30,8 @@ const seed = async () => {
 
     const company = await Company.create({
       name: "Demo Company",
-      domain: "crm.com"
+      domain: "crm.com",
+      domains: ["crm.com", "gmail.com"]
     });
     const user = await User.create({
       email: "demo@crm.com",

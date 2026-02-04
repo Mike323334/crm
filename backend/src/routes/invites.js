@@ -37,7 +37,11 @@ router.post("/", requireRole("admin"), async (req, res) => {
   if (!isAllowedDomain(emailDomain)) {
     return res.status(403).json({ message: "Email domain not allowed" });
   }
-  if (emailDomain !== company.domain) {
+  const companyDomains =
+    company.domains && company.domains.length > 0
+      ? company.domains
+      : [company.domain].filter(Boolean);
+  if (!companyDomains.includes(emailDomain)) {
     return res.status(403).json({ message: "Email domain not allowed" });
   }
 

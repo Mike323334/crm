@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const companySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    domain: { type: String, required: true, trim: true, lowercase: true }
+    domain: { type: String, trim: true, lowercase: true },
+    domains: [{ type: String, trim: true, lowercase: true }]
   },
   { timestamps: true }
 );
