@@ -6,7 +6,11 @@ const User = require("../models/User");
 const { auth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
-const allowedDomain = process.env.ALLOWED_DOMAIN?.toLowerCase();
+const allowedDomains = process.env.ALLOWED_DOMAIN
+  ? process.env.ALLOWED_DOMAIN.split(",").map((item) => item.trim().toLowerCase())
+  : [];
+const isAllowedDomain = (domain) =>
+  allowedDomains.length === 0 || allowedDomains.includes(domain);
 
 router.use(auth);
 
@@ -30,7 +34,7 @@ router.post("/", requireRole("admin"), async (req, res) => {
   }
 
   const emailDomain = normalizedEmail.split("@")[1] || "";
-  if (allowedDomain && emailDomain !== allowedDomain) {
+  if (!isAllowedDomain(emailDomain)) {
     return res.status(403).json({ message: "Email domain not allowed" });
   }
   if (emailDomain !== company.domain) {

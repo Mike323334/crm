@@ -1,13 +1,19 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const User = require("../models/User");
 const Company = require("../models/Company");
 const Invite = require("../models/Invite");
 const { auth } = require("../middleware/auth");
 
 const getEmailDomain = (email) => email.split("@")[1]?.toLowerCase() || "";
-const allowedDomain = process.env.ALLOWED_DOMAIN?.toLowerCase();
+const allowedDomains = process.env.ALLOWED_DOMAIN
+  ? process.env.ALLOWED_DOMAIN.split(",").map((item) => item.trim().toLowerCase())
+  : [];
+
+const isAllowedDomain = (domain) =>
+  allowedDomains.length === 0 || allowedDomains.includes(domain);
 
 const router = express.Router();
 
@@ -54,7 +60,7 @@ router.post("/register", async (req, res) => {
       if (!company) {
         return res.status(400).json({ message: "Company not found" });
       }
-      if (allowedDomain && emailDomain !== allowedDomain) {
+      if (!isAllowedDomain(emailDomain)) {
         return res.status(403).json({ message: "Email domain not allowed" });
       }
       if (company.domain !== emailDomain) {
@@ -79,7 +85,7 @@ router.post("/register", async (req, res) => {
           .json({ message: "Company name and domain required" });
       }
       const emailDomain = getEmailDomain(normalizedEmail);
-      if (allowedDomain && emailDomain !== allowedDomain) {
+      if (!isAllowedDomain(emailDomain)) {
         return res.status(403).json({ message: "Email domain not allowed" });
       }
       if (emailDomain !== companyDomain.toLowerCase()) {
@@ -153,9 +159,40 @@ router.post("/forgot", async (req, res) => {
   user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
+  const frontendUrl = process.env.FRONTEND_URL || "";
+  const resetLink = frontendUrl
+    ? `${frontendUrl}?resetToken=${token}`
+    : null;
+
+  if (resetLink && process.env.SMTP_HOST) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: process.env.SMTP_SECURE === "true",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: normalizedEmail,
+        subject: "Reset your CRM password",
+        text: `Use this link to reset your password: ${resetLink}`,
+        html: `<p>Use this link to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to send reset email", error);
+    }
+  }
+
   return res.json({
     success: true,
-    resetToken: token
+    resetToken: token,
+    resetLink
   });
 });
 

@@ -73,6 +73,7 @@ const App = () => {
   const [resetToken, setResetToken] = useState("");
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resetInfo, setResetInfo] = useState("");
+  const [resetLink, setResetLink] = useState("");
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [me, setMe] = useState(null);
   const [error, setError] = useState("");
@@ -172,6 +173,7 @@ const App = () => {
       const result = await forgotPassword(forgotEmail);
       if (result.resetToken) {
         setResetToken(result.resetToken);
+        setResetLink(result.resetLink || "");
         setResetInfo("Reset token generated. Paste it below to reset.");
       } else {
         setResetInfo("If the email exists, a reset token was created.");
@@ -198,6 +200,15 @@ const App = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("resetToken");
+    if (token) {
+      setResetToken(token);
+      setResetInfo("Reset token loaded from link.");
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -796,6 +807,14 @@ const App = () => {
               </button>
             </form>
             {resetInfo ? <p className="muted">{resetInfo}</p> : null}
+            {resetLink ? (
+              <p className="muted">
+                Reset link:{" "}
+                <a href={resetLink} target="_blank" rel="noreferrer">
+                  {resetLink}
+                </a>
+              </p>
+            ) : null}
           </section>
 
           <section className="card">

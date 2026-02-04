@@ -19,7 +19,21 @@ MongoDB (Mongoose) and JWT authentication.
 PORT=4000
 MONGO_URI=mongodb://localhost:27017/crm
 JWT_SECRET=change_me
-ALLOWED_DOMAIN=crm.com
+ALLOWED_DOMAIN=crm.com,anotherdomain.com
+```
+
+### Email (password reset links)
+
+Set these in the backend environment to send reset links:
+
+```
+FRONTEND_URL=https://your-frontend-url
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=you@example.com
+SMTP_PASS=your_password
+SMTP_FROM="CRM Support <you@example.com>"
 ```
 
 3. Update `MONGO_URI` and `JWT_SECRET`
