@@ -189,10 +189,17 @@ router.post("/forgot", async (req, res) => {
         text: `Use this link to reset your password: ${resetLink}`,
         html: `<p>Use this link to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`
       });
+      // eslint-disable-next-line no-console
+      console.log(`Reset email sent to ${normalizedEmail}`);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to send reset email", error);
     }
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "Reset email not sent (missing FRONTEND_URL or SMTP_HOST)."
+    );
   }
 
   return res.json({
