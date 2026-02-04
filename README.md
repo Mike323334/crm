@@ -28,6 +28,13 @@ Set these in the backend environment to send reset links:
 
 ```
 FRONTEND_URL=https://your-frontend-url
+SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_FROM=verified@yourdomain.com
+```
+
+Optional SMTP fallback:
+
+```
 SMTP_HOST=smtp.yourprovider.com
 SMTP_PORT=587
 SMTP_SECURE=false

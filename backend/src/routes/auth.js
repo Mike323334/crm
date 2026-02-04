@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const sendgrid = require("@sendgrid/mail");
 const User = require("../models/User");
 const Company = require("../models/Company");
 const Invite = require("../models/Invite");
@@ -171,8 +172,29 @@ router.post("/forgot", async (req, res) => {
     : null;
 
   const hasSmtp = Boolean(process.env.SMTP_HOST);
+  const hasSendgrid = Boolean(process.env.SENDGRID_API_KEY);
 
-  if (resetLink && hasSmtp) {
+  if (resetLink && hasSendgrid) {
+    try {
+      sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
+      const fromEmail = process.env.SENDGRID_FROM || process.env.SMTP_FROM;
+      if (!fromEmail) {
+        throw new Error("SENDGRID_FROM is required");
+      }
+      await sendgrid.send({
+        to: normalizedEmail,
+        from: fromEmail,
+        subject: "Reset your CRM password",
+        text: `Use this link to reset your password: ${resetLink}`,
+        html: `<p>Use this link to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`
+      });
+      // eslint-disable-next-line no-console
+      console.log(`Reset email sent to ${normalizedEmail} via SendGrid`);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to send reset email via SendGrid", error);
+    }
+  } else if (resetLink && hasSmtp) {
     try {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -200,12 +222,12 @@ router.post("/forgot", async (req, res) => {
   } else if (!resetLink || !hasSmtp) {
     // eslint-disable-next-line no-console
     console.warn(
-      "Reset email not sent (missing FRONTEND_URL or SMTP_HOST)."
+      "Reset email not sent (missing FRONTEND_URL or email provider)."
     );
   }
 
   const response = { success: true };
-  if (!hasSmtp) {
+  if (!hasSmtp && !hasSendgrid) {
     response.resetToken = token;
     response.resetLink = resetLink;
   }
